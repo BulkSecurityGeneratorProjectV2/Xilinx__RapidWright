@@ -177,7 +177,7 @@ public class PhysNetlistReader {
                 Cell c = siteInst.getCell(belName);
                 if(c == null){
                     BEL bel = siteInst.getBEL(belName);
-                    c = new Cell(PhysNetlistWriter.LOCKED, bel, cellInst);
+                    c = new Cell(PhysNetlistWriter.LOCKED, bel);
                     c.setBELFixed(placement.getIsBelFixed());
                     c.setNullBEL(bel == null);
                     siteInst.addCell(c);
@@ -186,8 +186,7 @@ public class PhysNetlistReader {
 
                 // c Alternative Blocked Site Type // TODO
             } else if(physCells.get(cellName) == PhysCellType.PORT) {
-                siteInst.getBEL(belName);
-                Cell portCell = new Cell(cellName,siteInst.getBEL(belName),null);
+                Cell portCell = new Cell(cellName,siteInst.getBEL(belName));
                 portCell.setType(PhysNetlistWriter.PORT);
                 siteInst.addCell(portCell);
                 portCell.setBELFixed(placement.getIsBelFixed());
@@ -226,7 +225,7 @@ public class PhysNetlistReader {
                             + bel.getName() + " is not valid. HARD0 and HARD1 BEL types do not "
                             + "require placed cells.");
                 }
-                Cell cell = new Cell(cellName, siteInst, bel, cellInst);
+                Cell cell = new Cell(cellName, siteInst, bel);
                 cell.setBELFixed(placement.getIsBelFixed());
                 cell.setSiteFixed(placement.getIsSiteFixed());
 
@@ -267,7 +266,7 @@ public class PhysNetlistReader {
                                     + " in site " + siteInst.getSiteName() + " of type "
                                     + siteInst.getSiteTypeEnum());
                         }
-                        c = new Cell(cellName, bel, cellInst);
+                        c = new Cell(cellName, bel);
                         c.setSiteInst(siteInst);
                         siteInst.getCellMap().put(belName, c);
                         c.setRoutethru(true);
@@ -444,20 +443,21 @@ public class PhysNetlistReader {
                     if (branchesCount == 0) {
                         // ... and it routed through a LUT along the way
                         if (routeThruLutInput != null) {
-                            // Then place a route-thru LUT
-
-                            // Make sure nothing placed there already
-                            assert(siteInst.getCell(routeThruLutInput.getBEL()) == null);
+                            // Check that a routethru cell exists
 
                             Cell belCell = siteInst.getCell(bel);
-                            EDIFCellInst cellInst = belCell.getEDIFCellInst();
-                            assert(cellInst != null);
-
-                            Cell c = new Cell(belCell.getName(), routeThruLutInput.getBEL(), cellInst);
-                            c.setSiteInst(siteInst);
-                            siteInst.getCellMap().put(routeThruLutInput.getBELName(), c);
-                            c.setRoutethru(true);
-                            c.addPinMapping(routeThruLutInput.getName(), belCell.getLogicalPinMapping(belPinName));
+                            Cell routeThruCell = siteInst.getCell(routeThruLutInput.getBEL());
+                            if (routeThruCell == null) {
+                                throw new RuntimeException("Expected routethru cell at " + siteInst.getSiteName() +
+                                        "/" + routeThruLutInput.getBELName());
+                            }
+                            String physicalPin = routeThruLutInput.getName();
+                            String logicalPin = belCell.getLogicalPinMapping(belPinName);
+                            if (routeThruCell.getSiteInst() != siteInst ||
+                                !routeThruCell.isRoutethru() ||
+                                !routeThruCell.getLogicalPinMapping(physicalPin).equals(logicalPin)) {
+                                throw new RuntimeException("Invalid routethru cell: " + routeThruCell);
+                            }
                         }
                     } else if (belName.endsWith("LUT")) {
                         assert (routeThruLutInput == null);
